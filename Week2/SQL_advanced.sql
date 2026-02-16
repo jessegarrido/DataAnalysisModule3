@@ -17,20 +17,34 @@ USE coffeeshop_db;
 -- Filter to orders where order_total is greater than the average PAID order_total
 -- for THAT SAME store (correlated subquery).
 -- Sort by store_name, then order_total DESC.
-select o.order_id, c.first_name as customer_name, s.name as store_name, order_datetime, SUM(quantity * p.price) as order_total from orders o
-where order_total > (select SUM(quantity * p.price) 
-	left join products p
-	on p.product_id = oi.product_id
-
-left join customers c
-	on o.customer_id = c.customer_id
-left join stores s
-	on o.store_id = s.store_id
-left join order_items oi
-	on oi.order_id = o.order_id
-
-
-where o.status like "paid";
+SELECT 
+    o.order_id,
+    c.customer_name,
+    s.store_name,
+    o.order_datetime,
+    SUM(oi.quantity * p.price) AS order_total
+FROM orders o
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
+JOIN customers c ON o.customer_id = c.customer_id
+JOIN stores s ON o.store_id = s.store_id
+WHERE o.status = 'PAID'
+GROUP BY o.order_id, c.customer_name, s.store_name, o.order_datetime
+HAVING SUM(oi.quantity * p.price) > (
+    SELECT AVG(sub_total)
+    FROM (
+        SELECT 
+            o2.order_id,
+            SUM(oi2.quantity * p2.price) AS sub_total
+        FROM orders o2
+        JOIN order_items oi2 ON o2.order_id = oi2.order_id
+        JOIN products p2 ON oi2.product_id = p2.product_id
+        WHERE o2.status = 'PAID'
+          AND o2.store_id = o.store_id
+        GROUP BY o2.order_id
+    ) AS store_order_totals
+)
+ORDER BY s.store_name ASC, order_total DESC;
 -- =========================================================
 -- Q2) CTE: Daily revenue and 3-day rolling average (PAID only)
 -- =========================================================
