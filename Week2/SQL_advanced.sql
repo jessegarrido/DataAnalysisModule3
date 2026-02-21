@@ -18,33 +18,33 @@ USE coffeeshop_db;
 -- for THAT SAME store (correlated subquery).
 -- Sort by store_name, then order_total DESC.
 SELECT 
-    o.order_id,
-    c.customer_name,
-    s.store_name,
-    o.order_datetime,
+    o.order_id AS order_id,
+    CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+    s.name AS store_name,
+    o.order_datetime AS order_datetime,
     SUM(oi.quantity * p.price) AS order_total
 FROM orders o
-JOIN order_items oi ON o.order_id = oi.order_id
-JOIN products p ON oi.product_id = p.product_id
 JOIN customers c ON o.customer_id = c.customer_id
 JOIN stores s ON o.store_id = s.store_id
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
 WHERE o.status = 'PAID'
-GROUP BY o.order_id, c.customer_name, s.store_name, o.order_datetime
+GROUP BY o.order_id, c.first_name, c.last_name, s.name, o.order_datetime, o.store_id
 HAVING SUM(oi.quantity * p.price) > (
-    SELECT AVG(sub_total)
+    SELECT AVG(order_total)
     FROM (
         SELECT 
             o2.order_id,
-            SUM(oi2.quantity * p2.price) AS sub_total
+            SUM(oi2.quantity * p2.price) AS order_total
         FROM orders o2
         JOIN order_items oi2 ON o2.order_id = oi2.order_id
         JOIN products p2 ON oi2.product_id = p2.product_id
-        WHERE o2.status = 'PAID'
-          AND o2.store_id = o.store_id
+        WHERE o2.store_id = o.store_id
+            AND o2.status = 'PAID'
         GROUP BY o2.order_id
-    ) AS store_order_totals
+    ) AS store_orders
 )
-ORDER BY s.store_name ASC, order_total DESC;
+ORDER BY s.name, order_total DESC;
 -- =========================================================
 -- Q2) CTE: Daily revenue and 3-day rolling average (PAID only)
 -- =========================================================
